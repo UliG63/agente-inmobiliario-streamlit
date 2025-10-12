@@ -1,8 +1,7 @@
-streamlit==1.38.0
-langchain==0.2.14
-langchain-openai==0.1.14
-langchain-community==0.2.12
-openai==1.45.0
-pandas==2.2.3
-sqlite-utils==3.36
+streamlit
+langchain==0.1.16
+langchain-openai==0.1.3
+openai==1.23.6
+pandas
+sqlite-utils
 python-dotenv
