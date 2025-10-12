@@ -1,16 +1,7 @@
-# Core
 streamlit==1.38.0
-
-# LangChain stack estable
 langchain==0.2.14
 langchain-openai==0.1.14
 langchain-community==0.2.12
-
-# OpenAI client
 openai==1.45.0
-
-# Utilidades
 pandas==2.2.3
-
-# Base de datos SQLite
 sqlite-utils==3.36
