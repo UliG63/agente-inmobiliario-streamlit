@@ -4,7 +4,7 @@ import pandas as pd
 from difflib import get_close_matches
 import streamlit as st
 
-from langchain_openai import ChatOpenAI
+from langchain-openai import ChatOpenAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import tool
