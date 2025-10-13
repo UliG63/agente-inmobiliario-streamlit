@@ -280,6 +280,17 @@ def add_message(role: str, content: str):
         "content": content
     })
 
+#  --- FUNCIÓN PARA RECONSTRUIR HISTORIAL ---
+def build_chat_history() -> str:
+    """Convierte el historial de st.session_state en un string para el prompt."""
+    history_text = ""
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            history_text += f"Usuario: {msg['content']}\n"
+        else:
+            history_text += f"Asistente: {msg['content']}\n"
+    return history_text.strip()
+
 # --- INPUT DEL USUARIO ---
 user_input = st.chat_input("Escribe tu consulta sobre propiedades...")
 
@@ -292,7 +303,10 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("Buscando información..."):
             try:
-                response = executor.invoke({"input": user_input})
+                response = executor.invoke({
+                    "input": user_input,
+                    "chat_history": build_chat_history()   
+                })
                 assistant_response = response.get("output", "(Sin respuesta)")
             except Exception as e:
                 assistant_response = f"⚠️ Error procesando la consulta: {e}"
@@ -306,3 +320,4 @@ if st.session_state.messages:
         for msg in st.session_state.messages:
             role_icon = "👤" if msg["role"] == "user" else "🤖"
             st.write(f"**{role_icon}**: {msg['content']}")
+
