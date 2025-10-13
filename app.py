@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 from difflib import get_close_matches
 import streamlit as st
-
+import re 
 from typing import List
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_react_agent, AgentExecutor
