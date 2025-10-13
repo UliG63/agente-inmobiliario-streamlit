@@ -28,18 +28,44 @@ if not api_key:
     st.stop()
 
 # --- CARGA DE DATOS ---
+# --- RUTAS ---
 SQLITE_PATH = "real_estate.db"
 zones_path = "zones.csv"
 properties_path = "properties.csv"
 
-# Si la BD no existe, la creamos
-if not os.path.exists(SQLITE_PATH):
-    zones_df = pd.read_csv(zones_path)
-    properties_df = pd.read_csv(properties_path)
-    conn = sqlite3.connect(SQLITE_PATH)
-    zones_df.to_sql('zones', conn, if_exists='replace', index=False)
-    properties_df.to_sql('properties', conn, if_exists='replace', index=False)
-    conn.close()
+# --- CREACIÓN O VERIFICACIÓN DE LA BASE ---
+def initialize_database():
+    # Si la base no existe, la creamos
+    if not os.path.exists(SQLITE_PATH):
+        print("[INFO] Creando base de datos SQLite desde archivos CSV...")
+        zones_df = pd.read_csv(zones_path)
+        properties_df = pd.read_csv(properties_path)
+
+        with sqlite3.connect(SQLITE_PATH) as conn:
+            zones_df.to_sql('zones', conn, if_exists='replace', index=False)
+            properties_df.to_sql('properties', conn, if_exists='replace', index=False)
+
+        print("[INFO] Base de datos creada exitosamente.")
+    else:
+        print("[INFO] Base de datos existente encontrada.")
+
+    # Verificamos que existan las tablas requeridas
+    with sqlite3.connect(SQLITE_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [t[0] for t in cursor.fetchall()]
+
+        if 'zones' not in tables or 'properties' not in tables:
+            print("[WARN] Faltan tablas. Recreando la base...")
+            zones_df = pd.read_csv(zones_path)
+            properties_df = pd.read_csv(properties_path)
+            zones_df.to_sql('zones', conn, if_exists='replace', index=False)
+            properties_df.to_sql('properties', conn, if_exists='replace', index=False)
+        else:
+            print("[INFO] Tablas 'zones' y 'properties' verificadas.")
+
+# --- LLAMADA A LA FUNCIÓN ---
+initialize_database()
 
 # --- FUNCIONES ---
 # ==========================
