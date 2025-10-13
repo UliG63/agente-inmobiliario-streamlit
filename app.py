@@ -263,29 +263,46 @@ history = ChatMessageHistory()
 with_history = RunnableWithMessageHistory(agent, lambda session_id: history)
 executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-# --- INTERFAZ DE CHAT ---
+
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Agente Inmobiliario", page_icon="🏡", layout="wide")
 st.title("🏡 Asistente Inmobiliario Inteligente")
 
+# --- INICIALIZACIÓN SEGURA DEL HISTORIAL ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# --- FUNCIÓN PARA AGREGAR MENSAJES ---
+def add_message(role: str, content: str):
+    """Agrega un mensaje al historial con estructura consistente."""
+    st.session_state.messages.append({
+        "role": role,
+        "content": content
+    })
+
+# --- INPUT DEL USUARIO ---
 user_input = st.chat_input("Escribe tu consulta sobre propiedades...")
 
+# --- PROCESAMIENTO DE MENSAJE DEL USUARIO ---
 if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    add_message("user", user_input)
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         with st.spinner("Buscando información..."):
-            response = executor.invoke({"input": user_input})
-            st.markdown(response["output"])
-            st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+            try:
+                response = executor.invoke({"input": user_input})
+                assistant_response = response.get("output", "(Sin respuesta)")
+            except Exception as e:
+                assistant_response = f"⚠️ Error procesando la consulta: {e}"
 
-# --- HISTORIAL ---
+            st.markdown(assistant_response)
+            add_message("assistant", assistant_response)
+
+# --- HISTORIAL DE CONVERSACIÓN ---
 if st.session_state.messages:
     with st.expander("📝 Historial de conversación"):
         for msg in st.session_state.messages:
-            role = "👤" if msg["role"] == "user" else "🤖"
-            st.write(f"**{role}**: {msg['content']}")
+            role_icon = "👤" if msg["role"] == "user" else "🤖"
+            st.write(f"**{role_icon}**: {msg['content']}")
