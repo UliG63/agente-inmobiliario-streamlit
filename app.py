@@ -196,22 +196,22 @@ def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 # REGISTRO DE TOOLS EN LANGCHAIN
 # ==========================
 tools = [
-    Tool(
+    tool(
         name="SQLSchema",
         func=sql_schema_tool,
         description="Devuelve un resumen del esquema (tablas y columnas) de la base SQLite."
     ),
-    Tool(
+    tool(
         name="SQLQuery",
         func=sql_query_tool,
         description="Ejecuta una consulta SELECT segura sobre la base de datos."
     ),
-    Tool(
+    tool(
         name="EstimatePriceByZone",
         func=estimate_price_by_zone_tool,
         description="Estima el precio de una propiedad a partir de un texto que indique zona y metros cuadrados."
     ),
-    Tool(
+    tool(
         name="CalcularFinanciacion",
         func=calcular_financiacion_tool,
         description="Calcula financiación a partir de monto, cuotas y tasa de interés expresados en texto."
