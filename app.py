@@ -4,12 +4,14 @@ import pandas as pd
 from difflib import get_close_matches
 import streamlit as st
 
+from typing import List
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import tool
 from langchain.memory import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from dotenv import load_dotenv
 
 
 
