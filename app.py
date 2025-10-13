@@ -132,6 +132,7 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """Estima precio de propiedad a partir de texto libre."""
     text = text.lower().strip()
     try:
+        # Detectar superficie en m2
         m2_match = re.search(
             r'\b(\d+(?:[\.,]\d+)?)\s*(?:m2|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados)\b',
             text, re.IGNORECASE
@@ -140,22 +141,25 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
             return "No pude detectar los metros cuadrados en el texto."
         m2 = float(m2_match.group(1).replace(",", "."))
 
+        # Detectar nombre de la zona
         zone_match = re.search(
-            r'\b(?:en|zona|barrio)\s+([a-záéíóúüñ\s]+?)(?=\s*\d)',
+            r'\b(?:en|zona|barrio)\s+([a-záéíóúüñ\s]+)',
             text, re.IGNORECASE
         )
         if not zone_match:
             return "No pude detectar la zona en el texto."
         zone_name = zone_match.group(1).strip()
 
-        con = sqlite3.connect(db_path)
-        cur = con.cursor()
-        cur.execute("SELECT name, average_price_per_m2 FROM zones")
-        zones = cur.fetchall()
-        con.close()
+        # Conectar a la base
+        with sqlite3.connect(db_path) as con:
+            cur = con.cursor()
+            cur.execute("SELECT name, average_price_per_m2 FROM zones")
+            zones = cur.fetchall()
+
         if not zones:
             return "No hay zonas registradas en la base de datos."
 
+        # Buscar la zona más parecida
         zone_names = [z[0] for z in zones]
         matches = get_close_matches(zone_name, zone_names, n=1, cutoff=0.5)
         if not matches:
@@ -163,13 +167,17 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 
         matched_zone = matches[0]
         price_per_m2 = next((z[1] for z in zones if z[0] == matched_zone), None)
+        if price_per_m2 is None:
+            return f"No se pudo obtener el precio por m² para '{matched_zone}'."
+
+        # Calcular estimación
         estimated_price = m2 * price_per_m2
 
         return (
             f"Zona encontrada: {matched_zone}\n"
-            f"Precio promedio por m2: {price_per_m2}\n"
+            f"Precio promedio por m²: {price_per_m2}\n"
             f"Metros cuadrados: {m2}\n"
-            f"Precio estimado: {estimated_price:.2f}"
+            f"Precio estimado: {estimated_price:,.2f}"
         )
     except Exception as e:
         return f"Error al calcular precio estimado: {e}"
