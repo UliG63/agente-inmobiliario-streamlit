@@ -87,15 +87,16 @@ def parse_res(rows: List[tuple], cols: List[str], max_rows: int = 50) -> str:
 def sql_schema_tool(db_path: str = SQLITE_PATH) -> str:
     """Devuelve un resumen del esquema (tablas y columnas) de la base SQLite."""
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-        tables = [r[0] for r in cur.fetchall()]
-        lines = []
-        for t in tables:
-            cur.execute(f"PRAGMA table_info({t})")
-            cols = ", ".join(f"{c[1]} {c[2]}" for c in cur.fetchall())
-            lines.append(f"- {t}: {cols}")
-        return "Esquema:\n" + ("\n".join(lines) if lines else "(sin tablas)")
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            tables = [r[0] for r in cur.fetchall()]
+            lines = []
+            for t in tables:
+                cur.execute(f"PRAGMA table_info({t})")
+                cols = ", ".join(f"{c[1]} {c[2]}" for c in cur.fetchall())
+                lines.append(f"- {t}: {cols}")
+            return "Esquema:\n" + ("\n".join(lines) if lines else "(sin tablas)")
     except Exception as e:
         return f"Error al obtener esquema: {e}"
 
@@ -117,11 +118,12 @@ def sql_query_tool(query: str, db_path: str = SQLITE_PATH, max_rows: int = 50) -
         return "Se detectó una palabra clave no permitida para lectura segura."
 
     try:
-        cur = conn.cursor()
-        cur.execute(q)
-        rows = cur.fetchmany(max_rows)
-        cols = [d[0] for d in cur.description] if cur.description else []
-        return parse_res(rows, cols, max_rows)
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(q)
+            rows = cur.fetchmany(max_rows)
+            cols = [d[0] for d in cur.description] if cur.description else []
+            return parse_res(rows, cols, max_rows)
     except Exception as e:
         return f"Error al ejecutar la consulta: {e}"
 
