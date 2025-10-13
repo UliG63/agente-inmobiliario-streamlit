@@ -129,7 +129,11 @@ def sql_query_tool(query: str, db_path: str = SQLITE_PATH, max_rows: int = 50) -
 
 
 def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
-    """Estima precio de propiedad a partir de texto libre."""
+    """
+    Estima precio de propiedad a partir de texto libre.
+    Extrae zona y metros cuadrados y multiplica por average_price_per_m2.
+    El texto debe incluir la palabra zona seguido del nombre y los metros cuadrados seguido de la palabra m2.
+    """
     text = text.lower().strip()
     try:
         # Detectar superficie en m2
@@ -184,7 +188,10 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 
 
 def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
-    """Calcula financiación a partir de texto libre."""
+    """
+    Calcula la financiación de un préstamo o propiedad a partir de texto libre.
+    El texto debe incluir el monto (la parte entera sin puntos y hasta 2 cifras decimales separadas con una coma) seguido de la palabra "monto", cantidad de cuotas y tasa de interés anual.
+    """
     try:
         monto_match = re.search(r'\b(\d+(?:,\d{1,2})?)\s*monto\b', text, re.IGNORECASE)
         if monto_match:
