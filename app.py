@@ -27,15 +27,20 @@ if not api_key:
     st.warning("Por favor ingresa tu API Key en la barra lateral para comenzar.")
     st.stop()
 
-# --- CARGA DE DATOS ---
 # --- RUTAS ---
-SQLITE_PATH = "real_estate.db"
-zones_path = "zones.csv"
-properties_path = "properties.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SQLITE_PATH = os.path.join(BASE_DIR, "real_estate.db")
+zones_path = os.path.join(BASE_DIR, "zones.csv")
+properties_path = os.path.join(BASE_DIR, "properties.csv")
 
 # --- CREACIÓN O VERIFICACIÓN DE LA BASE ---
 def initialize_database():
-    # Si la base no existe, la creamos
+    # Verificar existencia de CSV
+    if not os.path.exists(zones_path) or not os.path.exists(properties_path):
+        print(f"[ERROR] No se encuentran los archivos CSV requeridos:\n- {zones_path}\n- {properties_path}")
+        return
+
+    # Crear base si no existe
     if not os.path.exists(SQLITE_PATH):
         print("[INFO] Creando base de datos SQLite desde archivos CSV...")
         zones_df = pd.read_csv(zones_path)
@@ -49,7 +54,7 @@ def initialize_database():
     else:
         print("[INFO] Base de datos existente encontrada.")
 
-    # Verificamos que existan las tablas requeridas
+    # Verificar tablas requeridas
     with sqlite3.connect(SQLITE_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
