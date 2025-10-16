@@ -195,7 +195,7 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
     Calcula la financiación de un préstamo o propiedad a partir de texto libre.
-    El texto debe incluir el monto (la parte entera sin puntos y hasta 2 cifras decimales separadas con una coma) seguido de la palabra "monto", cantidad de cuotas y tasa de interés anual.
+    El texto debe incluir el monto (la parte entera sin puntos y hasta 2 cifras decimales separadas con una coma), cantidad de cuotas y tasa de interés anual.
     """
     try:
         monto_match = re.search(r'\b(\d+(?:,\d{1,2})?)\s*monto\b', text, re.IGNORECASE)
