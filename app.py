@@ -27,34 +27,39 @@ if not api_key:
     st.warning("Por favor ingresa tu API Key en la barra lateral para comenzar.")
     st.stop()
 
-# --- RUTAS ---
+# --- RUTAS ABSOLUTAS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLITE_PATH = os.path.join(BASE_DIR, "real_estate.db")
-zones_path = os.path.join(BASE_DIR, "zones.csv")
-properties_path = os.path.join(BASE_DIR, "properties.csv")
+ZONES_PATH = os.path.join(BASE_DIR, "zones.csv")
+PROPERTIES_PATH = os.path.join(BASE_DIR, "properties.csv")
 
-# --- CREACIÓN O VERIFICACIÓN DE LA BASE ---
 def initialize_database():
-    # Verificar existencia de CSV
-    if not os.path.exists(zones_path) or not os.path.exists(properties_path):
-        print(f"[ERROR] No se encuentran los archivos CSV requeridos:\n- {zones_path}\n- {properties_path}")
+    # 🧪 Verificar si se puede escribir en el directorio
+    try:
+        test_file = os.path.join(BASE_DIR, "test_write.txt")
+        with open(test_file, "w") as f:
+            f.write("OK")
+        os.remove(test_file)
+        print("[INFO] ✔ Permisos de escritura verificados.")
+    except Exception as e:
+        print(f"[ERROR]  No se puede escribir en el directorio: {e}")
         return
 
-    # Crear base si no existe
+    #  Si la base no existe, crearla desde los CSV
     if not os.path.exists(SQLITE_PATH):
         print("[INFO] Creando base de datos SQLite desde archivos CSV...")
-        zones_df = pd.read_csv(zones_path)
-        properties_df = pd.read_csv(properties_path)
+        zones_df = pd.read_csv(ZONES_PATH)
+        properties_df = pd.read_csv(PROPERTIES_PATH)
 
         with sqlite3.connect(SQLITE_PATH) as conn:
             zones_df.to_sql('zones', conn, if_exists='replace', index=False)
             properties_df.to_sql('properties', conn, if_exists='replace', index=False)
 
-        print("[INFO] Base de datos creada exitosamente.")
+        print("[INFO] ✔ Base de datos creada exitosamente.")
     else:
-        print("[INFO] Base de datos existente encontrada.")
+        print("[INFO] ✔ Base de datos existente encontrada.")
 
-    # Verificar tablas requeridas
+    #  Verificar que existan las tablas requeridas
     with sqlite3.connect(SQLITE_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -62,12 +67,12 @@ def initialize_database():
 
         if 'zones' not in tables or 'properties' not in tables:
             print("[WARN] Faltan tablas. Recreando la base...")
-            zones_df = pd.read_csv(zones_path)
-            properties_df = pd.read_csv(properties_path)
+            zones_df = pd.read_csv(ZONES_PATH)
+            properties_df = pd.read_csv(PROPERTIES_PATH)
             zones_df.to_sql('zones', conn, if_exists='replace', index=False)
             properties_df.to_sql('properties', conn, if_exists='replace', index=False)
         else:
-            print("[INFO] Tablas 'zones' y 'properties' verificadas.")
+            print("[INFO] ✔ Tablas 'zones' y 'properties' verificadas.")
 
 # --- LLAMADA A LA FUNCIÓN ---
 initialize_database()
