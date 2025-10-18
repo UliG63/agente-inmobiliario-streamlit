@@ -6,3 +6,4 @@ openai
 pandas
 sqlite-utils
 python-dotenv
+word2number
