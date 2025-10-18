@@ -12,7 +12,7 @@ from langchain.tools import Tool
 from langchain.memory import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from dotenv import load_dotenv
-
+from word2number import w2n
 
 
 # Clave API (puede venir de variable de entorno o input en la app)
@@ -138,49 +138,97 @@ def sql_query_tool(query: str, db_path: str = SQLITE_PATH, max_rows: int = 50) -
         return f"Error al ejecutar la consulta: {e}"
 
 
+def text_to_number(text: str) -> float:
+    """
+    Convierte números escritos en palabras (en español simplificado) a número.
+    También maneja expresiones mixtas como 'once mil', 'mil quinientos', etc.
+    """
+    # Diccionario básico español-inglés para compatibilidad con w2n
+    mapping = {
+        "uno": "one", "una": "one", "dos": "two", "tres": "three", "cuatro": "four",
+        "cinco": "five", "seis": "six", "siete": "seven", "ocho": "eight", "nueve": "nine",
+        "diez": "ten", "once": "eleven", "doce": "twelve", "trece": "thirteen", "catorce": "fourteen",
+        "quince": "fifteen", "dieciséis": "sixteen", "diecisiete": "seventeen", "dieciocho": "eighteen",
+        "diecinueve": "nineteen", "veinte": "twenty", "treinta": "thirty", "cuarenta": "forty",
+        "cincuenta": "fifty", "sesenta": "sixty", "setenta": "seventy", "ochenta": "eighty",
+        "noventa": "ninety", "cien": "hundred", "ciento": "hundred", "mil": "thousand",
+        "millón": "million", "millones": "million", "media": "0.5"
+    }
+
+    # Reemplazar palabras españolas por sus equivalentes en inglés para que w2n funcione
+    words = text.lower()
+    for es, en in mapping.items():
+        words = re.sub(rf'\b{es}\b', en, words)
+
+    try:
+        return float(w2n.word_to_num(words))
+    except Exception:
+        return None
+
 def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
-    Usa esta herramienta cuando el usuario describa una propiedad y quieras estimar su precio aproximado.
-
-    La herramienta:
-    - Identifica el nombre de la zona a partir de frases como “en la zona de ___” o “ubicada en ___”.
-    - Detecta la superficie del terreno o propiedad, incluso si está escrita en diferentes formatos:
-      - “11000 m2”
-      - “11 mil metros cuadrados”
-      - “once mil metros”
-      - “11,000 m²”
-    - Convierte expresiones verbales o con palabras como “mil” a números.
-    - Calcula el precio multiplicando la superficie en m² por el precio promedio por m² de la zona.
-
-    Ejemplos de entradas válidas:
-    - “Tengo una casa para vender en la zona de Santa Anita. La casa tiene 11 mil metros cuadrados.”
-    - “Propiedad ubicada en San Miguel con 8500 m2.”
-    - “Casa en Lules, 1,2 hectáreas.”
-
-    Si no se puede identificar claramente la zona o la superficie, no devuelve ningún valor.
+    Estima el precio de una propiedad en base a texto libre.
+    Ahora también detecta números escritos con palabras y hectáreas.
     """
 
     text = text.lower().strip()
+
     try:
-        # Detectar superficie en m2
-        m2_match = re.search(
-            r'\b(\d+(?:[\.,]\d+)?)\s*(?:m2|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados)\b',
+        m2 = None
+
+        # --- Paso 1: Detectar y convertir expresiones con "mil" ---
+        mil_match = re.search(r'(\d+(?:[\.,]\d+)?)\s*mil', text)
+        if mil_match:
+            num_str = mil_match.group(1).replace(',', '.')
+            num = float(num_str) * 1000
+            text = re.sub(r'(\d+(?:[\.,]\d+)?)\s*mil', str(int(num)), text)
+
+        # --- Paso 2: Detectar hectáreas ---
+        ha_match = re.search(
+            r'(\d+(?:[\.,]\d+)?)\s*(?:ha|hect[aá]reas?)',
             text, re.IGNORECASE
         )
-        if not m2_match:
-            return "No pude detectar los metros cuadrados en el texto."
-        m2 = float(m2_match.group(1).replace(",", "."))
+        if ha_match:
+            ha = float(ha_match.group(1).replace(",", "."))
+            m2 = ha * 10000
 
-        # Detectar nombre de la zona
+        # --- Paso 3: Detectar número escrito en palabras (por ej. "once mil") ---
+        if m2 is None:
+            word_number_match = re.search(
+                r'([a-záéíóúüñ\s]+)\s*(?:m2|m²|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados|hect[aá]reas?)',
+                text, re.IGNORECASE
+            )
+            if word_number_match:
+                word_num = word_number_match.group(1).strip()
+                num_val = text_to_number(word_num)
+                if num_val:
+                    if "hect" in word_number_match.group(0).lower():
+                        m2 = num_val * 10000
+                    else:
+                        m2 = num_val
+
+        # --- Paso 4: Detectar números normales (fallback) ---
+        if m2 is None:
+            m2_match = re.search(
+                r'(\d+(?:[\.,]\d+)?)\s*(?:m2|m²|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados)',
+                text, re.IGNORECASE
+            )
+            if m2_match:
+                m2 = float(m2_match.group(1).replace(",", "."))
+
+        if m2 is None:
+            return "No pude detectar los metros cuadrados o hectáreas en el texto."
+
+        # --- Paso 5: Detectar nombre de la zona ---
         zone_match = re.search(
-            r'\b(?:en|zona|barrio)\s+([a-záéíóúüñ\s]+)',
+            r'\b(?:en\s+la\s+zona\s+de|en\s+zona\s+de|en\s+|zona\s+|barrio\s+)([a-záéíóúüñ\s]+)',
             text, re.IGNORECASE
         )
         if not zone_match:
             return "No pude detectar la zona en el texto."
         zone_name = zone_match.group(1).strip()
 
-        # Conectar a la base
+        # --- Paso 6: Conectar a la base ---
         with sqlite3.connect(db_path) as con:
             cur = con.cursor()
             cur.execute("SELECT name, average_price_per_m2 FROM zones")
@@ -189,7 +237,6 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
         if not zones:
             return "No hay zonas registradas en la base de datos."
 
-        # Buscar la zona más parecida
         zone_names = [z[0] for z in zones]
         matches = get_close_matches(zone_name, zone_names, n=1, cutoff=0.5)
         if not matches:
@@ -200,17 +247,17 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
         if price_per_m2 is None:
             return f"No se pudo obtener el precio por m² para '{matched_zone}'."
 
-        # Calcular estimación
         estimated_price = m2 * price_per_m2
 
         return (
             f"Zona encontrada: {matched_zone}\n"
             f"Precio promedio por m²: {price_per_m2}\n"
-            f"Metros cuadrados: {m2}\n"
-            f"Precio estimado: {estimated_price:,.2f}"
+            f"Superficie: {m2:,.2f} m²\n"
+            f"Precio estimado: ${estimated_price:,.2f}"
         )
     except Exception as e:
         return f"Error al calcular precio estimado: {e}"
+
 
 
 def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
