@@ -234,48 +234,92 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 
 
 
-def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
+def calcular_financiacion_tool(text: str) -> str:
     """
-    Usa esta herramienta cuando el usuario quiera calcular la financiación mensual aproximada de una propiedad o préstamo.
-
-    La herramienta:
-    - Identifica automáticamente el monto total (precio o valor del préstamo), la cantidad de cuotas o plazo y la tasa de interés anual a partir del texto del usuario.
-    - Calcula la cuota mensual aproximada utilizando una fórmula estándar de préstamos.
-    - Devuelve el valor de la cuota mensual y el costo total aproximado del financiamiento.
-
-    Ejemplos de usos típicos:
-    - “Quiero financiar una casa de 10.000.000 en 240 cuotas al 7% anual.”
-    - “Cuánto pagaría por mes si pido un préstamo de 15 millones a 20 años con una tasa del 8,5%.”
-    - “Simulá un crédito hipotecario de 80.000 dólares en 10 años al 5%.”
-
-    Si el texto no incluye monto, cantidad de cuotas (o plazo) y tasa de interés, no puede hacer el cálculo.
+    [VERSIÓN MEJORADA]
+    Calcula la financiación de un préstamo a partir de texto libre.
+    Extrae de forma robusta el monto, el plazo (en años o meses) y la tasa de interés anual.
     """
     try:
-        monto_match = re.search(r'\b(\d+(?:,\d{1,2})?)\s*monto\b', text, re.IGNORECASE)
-        if monto_match:
-            monto = float(monto_match.group(1).replace(',', '.'))
-        else:
-            return "No se encontró monto. Formato esperado: '500000,50 monto'"
+        text_lower = text.lower()
+        monto = None
+        cuotas = None
+        interes_anual = None
 
-        cuotas_match = re.search(r'\b(\d+)\s*(?:cuotas|meses)\b', text, re.IGNORECASE)
-        if cuotas_match:
-            cuotas = int(cuotas_match.group(1))
-        else:
-            return "No se encontró cantidad de cuotas."
-
-        interes_match = re.search(
-            r'(?:inter[eé]s|tasa(?:\s+anual)?|al)?\s*(?:anual\s*)?(?:del\s*)?(\d+(?:[.,]\d+)?)\s*%',
-            text, re.IGNORECASE
-        )
+        # --- 1. Normalizar "mil" ---
+        # Convierte "100 mil" en "100000"
+        mil_match = re.search(r'(\d+(?:[\.,]\d+)?)\s*mil', text_lower)
+        if mil_match:
+            num_str = mil_match.group(1).replace(',', '.')
+            num = float(num_str) * 1000
+            text_lower = re.sub(r'(\d+(?:[\.,]\d+)?)\s*mil', str(int(num)), text_lower)
+        
+        # --- 2. Extraer Tasa de Interés (el más fiable) ---
+        # Busca un número seguido de "%" o "porciento"
+        interes_match = re.search(r'(\d+(?:[.,]\d+)?)\s*(?:%|porciento|pct)', text_lower)
         if interes_match:
             interes_anual = float(interes_match.group(1).replace(',', '.'))
         else:
-            return "No se encontró tasa de interés."
+            return "No se encontró la tasa de interés anual (ej. '5%')."
 
+        # --- 3. Extraer Plazo (Años o Meses) ---
+        # Busca primero "años"
+        anos_match = re.search(r'(\d+)\s*(?:a[ñn]os?|a)\b', text_lower)
+        if anos_match:
+            cuotas = int(anos_match.group(1)) * 12
+        else:
+            # Si no, busca "cuotas" o "meses"
+            cuotas_match = re.search(r'(\d+)\s*(?:cuotas|meses)\b', text_lower)
+            if cuotas_match:
+                cuotas = int(cuotas_match.group(1))
+        
+        if cuotas is None:
+            return "No se encontró el plazo del préstamo (ej. '240 cuotas' o '20 años')."
+
+        # --- 4. Extraer Monto Principal (Múltiples estrategias) ---
+        
+        # Función para limpiar el número (quitar '.' de miles, dejar ',' como decimal)
+        def clean_num_str(s):
+            s_cleaned = s.replace('.', '').replace(',', '.')
+            return s_cleaned
+
+        # Estrategia 1: Buscar cerca de palabras clave
+        monto_match = re.search(r'(?:monto|pr[eé]stamo|valor|precio|financiar|de)\s*[$ARSUSD]*\s*([\d\.,]+)', text_lower)
+        if monto_match:
+            monto = float(clean_num_str(monto_match.group(1)))
+
+        # Estrategia 2: Buscar cerca de símbolo de moneda
+        if monto is None:
+            monto_match = re.search(r'[$ARSUSD]\s*([\d\.,]+)', text_lower)
+            if monto_match:
+                monto = float(clean_num_str(monto_match.group(1)))
+
+        # Estrategia 3: Buscar el número más grande que no sea la tasa o el plazo
+        if monto is None:
+            all_nums = re.findall(r'(\d+(?:[.,]\d+)?\d*)', text_lower.replace(',', '.')) # Usar . como decimal
+            possible_montos = []
+            for num_str in all_nums:
+                try:
+                    num_val = float(num_str)
+                    # Descartar si es la tasa, las cuotas, o los años
+                    if num_val != interes_anual and num_val != cuotas and num_val != (cuotas / 12):
+                        if num_val > 1000: # Asumir que un préstamo es > 1000
+                            possible_montos.append(num_val)
+                except ValueError:
+                    continue
+            
+            if possible_montos:
+                monto = max(possible_montos) # Asumir que es el número más grande
+
+        if monto is None:
+            return "No se pudo identificar el monto principal del préstamo."
+
+        # --- 5. Realizar el Cálculo ---
         interes_mensual = interes_anual / 12 / 100
         if interes_mensual == 0:
             pago_mensual = monto / cuotas
         else:
+            # Fórmula de cuota fija (sistema francés)
             pago_mensual = monto * (interes_mensual * (1 + interes_mensual)**cuotas) / ((1 + interes_mensual)**cuotas - 1)
 
         total_pagado = pago_mensual * cuotas
@@ -283,15 +327,16 @@ def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 
         return (
             f"Financiación calculada:\n"
-            f"Monto: {monto}\n"
-            f"Cuotas: {cuotas}\n"
-            f"Interés anual: {interes_anual}%\n"
-            f"Pago mensual: {pago_mensual:.2f}\n"
-            f"Monto total pagado: {total_pagado:.2f}\n"
-            f"Intereses totales: {intereses_totales:.2f}"
+            f"Monto del préstamo: ${monto:,.2f}\n"
+            f"Plazo: {cuotas} cuotas ({cuotas / 12:.0f} años)\n"
+            f"Tasa de interés anual: {interes_anual}%\n"
+            f"Pago mensual estimado: ${pago_mensual:,.2f}\n"
+            f"Monto total pagado: ${total_pagado:,.2f}\n"
+            f"Total de intereses: ${intereses_totales:,.2f}"
         )
+
     except Exception as e:
-        return f"Error en cálculo de financiación: {e}"
+        return f"Error al calcular la financiación: {e}"
 
 # ==========================
 # REGISTRO DE TOOLS EN LANGCHAIN
