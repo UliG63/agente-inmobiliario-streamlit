@@ -1,7 +1,7 @@
 streamlit
 langchain
-langchain-openai
-langchain-community
+langchain==0.1.20
+langchain-openai==0.0.8
 openai
 pandas
 sqlite-utils
