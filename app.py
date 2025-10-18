@@ -140,20 +140,26 @@ def sql_query_tool(query: str, db_path: str = SQLITE_PATH, max_rows: int = 50) -
 
 def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
-    Usa esta herramienta cuando el usuario quiera estimar el precio de una propiedad en función de su zona y su superficie en metros cuadrados.
+    Usa esta herramienta cuando el usuario describa una propiedad y quieras estimar su precio aproximado.
 
     La herramienta:
-    - Identifica automáticamente el nombre de la zona y la cantidad de metros cuadrados en el texto del usuario.
-    - Calcula el precio estimado multiplicando la superficie por el precio promedio por m² en esa zona.
-    - Devuelve un único valor estimado en la moneda configurada.
+    - Identifica el nombre de la zona a partir de frases como “en la zona de ___” o “ubicada en ___”.
+    - Detecta la superficie del terreno o propiedad, incluso si está escrita en diferentes formatos:
+      - “11000 m2”
+      - “11 mil metros cuadrados”
+      - “once mil metros”
+      - “11,000 m²”
+    - Convierte expresiones verbales o con palabras como “mil” a números.
+    - Calcula el precio multiplicando la superficie en m² por el precio promedio por m² de la zona.
 
-    Ejemplos de usos típicos:
-    - “Cuánto cuesta una casa de 120 m2 en Yerba Buena?”
-    - “Dame el precio estimado de 90 metros cuadrados en zona Centro.”
-    - “Valor aproximado de 250m2 en Tafí Viejo.”
+    Ejemplos de entradas válidas:
+    - “Tengo una casa para vender en la zona de Santa Anita. La casa tiene 11 mil metros cuadrados.”
+    - “Propiedad ubicada en San Miguel con 8500 m2.”
+    - “Casa en Lules, 1,2 hectáreas.”
 
-    Si no se menciona una zona o superficie clara, no puede hacer la estimación.
+    Si no se puede identificar claramente la zona o la superficie, no devuelve ningún valor.
     """
+
     text = text.lower().strip()
     try:
         # Detectar superficie en m2
