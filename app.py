@@ -140,9 +140,19 @@ def sql_query_tool(query: str, db_path: str = SQLITE_PATH, max_rows: int = 50) -
 
 def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
-    Estima precio de propiedad a partir de texto libre.
-    Extrae zona y metros cuadrados y multiplica por average_price_per_m2.
-    El texto debe incluir la palabra zona seguido del nombre y los metros cuadrados seguido de la palabra m2.
+    Usa esta herramienta cuando el usuario quiera estimar el precio de una propiedad en función de su zona y su superficie en metros cuadrados.
+
+    La herramienta:
+    - Identifica automáticamente el nombre de la zona y la cantidad de metros cuadrados en el texto del usuario.
+    - Calcula el precio estimado multiplicando la superficie por el precio promedio por m² en esa zona.
+    - Devuelve un único valor estimado en la moneda configurada.
+
+    Ejemplos de usos típicos:
+    - “Cuánto cuesta una casa de 120 m2 en Yerba Buena?”
+    - “Dame el precio estimado de 90 metros cuadrados en zona Centro.”
+    - “Valor aproximado de 250m2 en Tafí Viejo.”
+
+    Si no se menciona una zona o superficie clara, no puede hacer la estimación.
     """
     text = text.lower().strip()
     try:
@@ -199,8 +209,19 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
 
 def calcular_financiacion_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
-    Calcula la financiación de un préstamo o propiedad a partir de texto libre.
-    El texto debe incluir el monto (la parte entera sin puntos y hasta 2 cifras decimales separadas con una coma), cantidad de cuotas y tasa de interés anual.
+    Usa esta herramienta cuando el usuario quiera calcular la financiación mensual aproximada de una propiedad o préstamo.
+
+    La herramienta:
+    - Identifica automáticamente el monto total (precio o valor del préstamo), la cantidad de cuotas o plazo y la tasa de interés anual a partir del texto del usuario.
+    - Calcula la cuota mensual aproximada utilizando una fórmula estándar de préstamos.
+    - Devuelve el valor de la cuota mensual y el costo total aproximado del financiamiento.
+
+    Ejemplos de usos típicos:
+    - “Quiero financiar una casa de 10.000.000 en 240 cuotas al 7% anual.”
+    - “Cuánto pagaría por mes si pido un préstamo de 15 millones a 20 años con una tasa del 8,5%.”
+    - “Simulá un crédito hipotecario de 80.000 dólares en 10 años al 5%.”
+
+    Si el texto no incluye monto, cantidad de cuotas (o plazo) y tasa de interés, no puede hacer el cálculo.
     """
     try:
         monto_match = re.search(r'\b(\d+(?:,\d{1,2})?)\s*monto\b', text, re.IGNORECASE)
