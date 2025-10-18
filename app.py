@@ -30,52 +30,13 @@ if not api_key:
 # --- RUTAS ABSOLUTAS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLITE_PATH = os.path.join(BASE_DIR, "real_estate.db")
-ZONES_PATH = os.path.join(BASE_DIR, "zones.csv")
-PROPERTIES_PATH = os.path.join(BASE_DIR, "properties.csv")
 
-def initialize_database():
-    # 🧪 Verificar si se puede escribir en el directorio
-    try:
-        test_file = os.path.join(BASE_DIR, "test_write.txt")
-        with open(test_file, "w") as f:
-            f.write("OK")
-        os.remove(test_file)
-        print("[INFO] ✔ Permisos de escritura verificados.")
-    except Exception as e:
-        print(f"[ERROR]  No se puede escribir en el directorio: {e}")
-        return
-
-    #  Si la base no existe, crearla desde los CSV
-    if not os.path.exists(SQLITE_PATH):
-        print("[INFO] Creando base de datos SQLite desde archivos CSV...")
-        zones_df = pd.read_csv(ZONES_PATH)
-        properties_df = pd.read_csv(PROPERTIES_PATH)
-
-        with sqlite3.connect(SQLITE_PATH) as conn:
-            zones_df.to_sql('zones', conn, if_exists='replace', index=False)
-            properties_df.to_sql('properties', conn, if_exists='replace', index=False)
-
-        print("[INFO] ✔ Base de datos creada exitosamente.")
-    else:
-        print("[INFO] ✔ Base de datos existente encontrada.")
-
-    #  Verificar que existan las tablas requeridas
-    with sqlite3.connect(SQLITE_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = [t[0] for t in cursor.fetchall()]
-
-        if 'zones' not in tables or 'properties' not in tables:
-            print("[WARN] Faltan tablas. Recreando la base...")
-            zones_df = pd.read_csv(ZONES_PATH)
-            properties_df = pd.read_csv(PROPERTIES_PATH)
-            zones_df.to_sql('zones', conn, if_exists='replace', index=False)
-            properties_df.to_sql('properties', conn, if_exists='replace', index=False)
-        else:
-            print("[INFO] ✔ Tablas 'zones' y 'properties' verificadas.")
-
-# --- LLAMADA A LA FUNCIÓN ---
-initialize_database()
+# --- VERIFICAR EXISTENCIA DE LA BASE DE DATOS ---
+# (La app de Streamlit solo lee, nunca escribe)
+if not os.path.exists(SQLITE_PATH):
+    st.error(f"Error Crítico: No se encuentra el archivo 'real_estate.db'.")
+    st.error("Por favor, asegúrese de que el archivo .db esté en el repositorio de GitHub.")
+    st.stop()
 
 # --- FUNCIONES ---
 # ==========================
