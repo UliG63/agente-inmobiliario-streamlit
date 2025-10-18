@@ -407,7 +407,7 @@ tools = tools
 agent = create_react_agent(llm, tools, prompt)
 history = ChatMessageHistory()
 with_history = RunnableWithMessageHistory(agent, lambda session_id: history)
-executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
