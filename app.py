@@ -128,23 +128,27 @@ def text_to_number(text: str) -> float:
 
 def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
     """
+    [VERSIÓN MEJORADA]
     Estima el precio de una propiedad en base a texto libre.
-    Ahora también detecta números escritos con palabras y hectáreas.
+    Detecta m2, hectáreas y la zona (buscando en la BD).
     """
 
     text = text.lower().strip()
+    m2 = None
+    matched_zone = None
+    price_per_m2 = None
 
     try:
-        m2 = None
-
-        # --- Paso 1: Detectar y convertir expresiones con "mil" ---
+        # --- PASO 1: Detectar Superficie (m2 o hectáreas) ---
+        
+        # --- Detectar y convertir expresiones con "mil" ---
         mil_match = re.search(r'(\d+(?:[\.,]\d+)?)\s*mil', text)
         if mil_match:
             num_str = mil_match.group(1).replace(',', '.')
             num = float(num_str) * 1000
             text = re.sub(r'(\d+(?:[\.,]\d+)?)\s*mil', str(int(num)), text)
 
-        # --- Paso 2: Detectar hectáreas ---
+        # --- Detectar hectáreas ---
         ha_match = re.search(
             r'(\d+(?:[\.,]\d+)?)\s*(?:ha|hect[aá]reas?)',
             text, re.IGNORECASE
@@ -153,7 +157,7 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
             ha = float(ha_match.group(1).replace(",", "."))
             m2 = ha * 10000
 
-        # --- Paso 3: Detectar número escrito en palabras (por ej. "once mil") ---
+        # --- Detectar número escrito en palabras (por ej. "once mil") ---
         if m2 is None:
             word_number_match = re.search(
                 r'([a-záéíóúüñ\s]+)\s*(?:m2|m²|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados|hect[aá]reas?)',
@@ -168,7 +172,7 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
                     else:
                         m2 = num_val
 
-        # --- Paso 4: Detectar números normales (fallback) ---
+        # --- Detectar números normales (fallback) ---
         if m2 is None:
             m2_match = re.search(
                 r'(\d+(?:[\.,]\d+)?)\s*(?:m2|m²|mts2|m\s*cuadrados|mts\s*cuadrados|metros\s*cuadrados)',
@@ -180,34 +184,41 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
         if m2 is None:
             return "No pude detectar los metros cuadrados o hectáreas en el texto."
 
-        # --- Paso 5: Detectar nombre de la zona ---
-        zone_match = re.search(
-            r'\b(?:en\s+la\s+zona\s+de|en\s+zona\s+de|en\s+|zona\s+|barrio\s+)([a-záéíóúüñ\s]+)',
-            text, re.IGNORECASE
-        )
-        if not zone_match:
-            return "No pude detectar la zona en el texto."
-        zone_name = zone_match.group(1).strip()
-
-        # --- Paso 6: Conectar a la base ---
+        # --- PASO 2: Detectar Zona (Lógica Mejorada) ---
+        
+        # Conectar a la BD y obtener la lista de zonas
         with sqlite3.connect(db_path) as con:
             cur = con.cursor()
             cur.execute("SELECT name, average_price_per_m2 FROM zones")
-            zones = cur.fetchall()
+            zones_data = cur.fetchall()
 
-        if not zones:
+        if not zones_data:
             return "No hay zonas registradas en la base de datos."
 
-        zone_names = [z[0] for z in zones]
-        matches = get_close_matches(zone_name, zone_names, n=1, cutoff=0.5)
-        if not matches:
-            return f"No se encontró ninguna zona similar a '{zone_name}'."
+        # Buscar en el texto CUALQUIERA de los nombres de zona de la BD
+        for zone_name, price_val in zones_data:
+            # Buscamos la zona como palabra completa (evita que "Devoto" coincida con "Devotional")
+            if re.search(rf'\b{re.escape(zone_name.lower())}\b', text, re.IGNORECASE):
+                matched_zone = zone_name
+                price_per_m2 = price_val
+                break # Encontramos la primera zona que coincide
 
-        matched_zone = matches[0]
-        price_per_m2 = next((z[1] for z in zones if z[0] == matched_zone), None)
-        if price_per_m2 is None:
-            return f"No se pudo obtener el precio por m² para '{matched_zone}'."
+        if not matched_zone:
+            # Usamos get_close_matches como fallback si no hay coincidencia exacta
+            zone_names_list = [z[0] for z in zones_data]
+            # Intentamos extraer algo del texto para comparar
+            zone_guess_match = re.search(r'(?:en|zona|barrio)\s+([a-záéíóúüñ\s]+)', text)
+            if zone_guess_match:
+                zone_guess = zone_guess_match.group(1).strip()
+                matches = get_close_matches(zone_guess, zone_names_list, n=1, cutoff=0.6)
+                if matches:
+                    matched_zone = matches[0]
+                    price_per_m2 = next((z[1] for z in zones_data if z[0] == matched_zone), None)
 
+        if not matched_zone or price_per_m2 is None:
+            return f"No pude encontrar una zona válida en la consulta o no tengo datos de precios para ella."
+
+        # --- PASO 3: Calcular y devolver resultado ---
         estimated_price = m2 * price_per_m2
 
         return (
@@ -216,7 +227,9 @@ def estimate_price_by_zone_tool(text: str, db_path: str = SQLITE_PATH) -> str:
             f"Superficie: {m2:,.2f} m²\n"
             f"Precio estimado: ${estimated_price:,.2f}"
         )
+
     except Exception as e:
+        # Devuelve el error específico para ayudar a depurar
         return f"Error al calcular precio estimado: {e}"
 
 
